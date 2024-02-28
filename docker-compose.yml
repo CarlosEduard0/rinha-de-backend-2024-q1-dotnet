@@ -18,7 +18,7 @@ services:
           memory: "10MB"
 
   api1: &api
-    image: carloseduard0/rinha-backend-csharp
+    image: carloseduard0/rinha-backend-dotnet
     restart: unless-stopped
     depends_on:
       - postgres
