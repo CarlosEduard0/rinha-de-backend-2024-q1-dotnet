@@ -1,12 +1,17 @@
 ﻿using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Threading.Channels;
 using StackExchange.Redis;
 
 namespace RinhaBackend;
 
 public static class CreateTransactionCache
 {
-    private static readonly ConcurrentQueue<CreateTransactionCacheEntry> _buffer = new();
+    private static readonly BoundedChannelOptions _channelOptions = new(10)
+    {
+        FullMode = BoundedChannelFullMode.DropOldest
+    };
+    private static readonly ConcurrentDictionary<int, Channel<CreateTransactionCacheEntry>> _buffers = new();
 
     public static void Load(CancellationToken cancellationToken)
     {
@@ -22,7 +27,8 @@ public static class CreateTransactionCache
         Interlocked.Increment(ref CacheWriteThroughput);
         if (shouldUseBuffer)
         {
-            _buffer.Enqueue(entry);
+            var channel = _buffers.GetOrAdd(entry.ClientId, id => Channel.CreateBounded<CreateTransactionCacheEntry>(_channelOptions));
+            channel.Writer.TryWrite(entry);
 
             return;
         }
@@ -34,26 +40,23 @@ public static class CreateTransactionCache
 
     private static async Task Flush(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested || !_buffer.IsEmpty)
+        while (!cancellationToken.IsCancellationRequested)
         {
-            if (!_buffer.IsEmpty)
+            var batch = RinhaBackendCache.Database.CreateBatch();
+            foreach (var (_, channel) in _buffers)
             {
-                var batch = RinhaBackendCache.Database.CreateBatch();
-                var bufferCount = _buffer.Count;
-                int elementsDequeuedCount = 0;
-                while (elementsDequeuedCount < bufferCount)
+                var count = 0;
+                while (count < 10 && channel.Reader.TryRead(out var entry))
                 {
-                    if (!_buffer.TryDequeue(out var entry))
-                        break;
                     var key = $"user:{entry.ClientId}:last_transactions";
                     var cacheEntry = JsonSerializer.Serialize(entry, AppJsonSerializerContext.Default.CreateTransactionCacheEntry);
                     batch.SortedSetAddAsync(key, cacheEntry, entry.Transaction.RealizadaEm.ToUnixTimeMicroseconds(), CommandFlags.FireAndForget);
-                    elementsDequeuedCount++;
+                    count++;
                 }
-                batch.Execute();
             }
+            batch.Execute();
 
-            await Task.Delay(300, CancellationToken.None);
+            await Task.Delay(1000, CancellationToken.None);
         }
     }
 
@@ -62,13 +65,12 @@ public static class CreateTransactionCache
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            if (CacheWriteThroughput >= 15 && !shouldUseBuffer)
+            if (!shouldUseBuffer && CacheWriteThroughput >= 15)
                 shouldUseBuffer = true;
             if (CacheWriteThroughput < 15 && shouldUseBuffer)
                 shouldUseBuffer = false;
 
-            if (CacheWriteThroughput > 0)
-                Interlocked.Exchange(ref CacheWriteThroughput, 0);
+            Interlocked.Exchange(ref CacheWriteThroughput, 0);
 
             await Task.Delay(1000, cancellationToken);
         }
