@@ -1,3 +1,4 @@
+using System.Text.Json;
 using RinhaBackend;
 
 await Task.WhenAll(RinhaBackendDatabase.Load(), RinhaBackendCache.Load());
@@ -19,6 +20,7 @@ builder.Services.AddRoutingCore();
 
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
 });
 

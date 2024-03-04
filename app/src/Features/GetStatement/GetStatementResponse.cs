@@ -1,12 +1,9 @@
-﻿using System.Text.Json.Serialization;
-
-namespace RinhaBackend;
+﻿namespace RinhaBackend;
 
 public record GetStatementResponse
 {
     public Balance Saldo { get; init; }
 
-    [JsonPropertyName("ultimas_transacoes")]
     public IEnumerable<Transaction> UltimasTransacoes { get; init; }
 
     public GetStatementResponse(Balance balance, IEnumerable<Transaction> transactions)
@@ -20,7 +17,6 @@ public record Balance
 {
     public int Total { get; init; }
 
-    [JsonPropertyName("data_extrato")]
     public DateTime DataExtrato { get; init; }
     public int Limite { get; init; }
 
@@ -38,7 +34,6 @@ public record Transaction
     public char Tipo { get; init; }
     public string Descricao { get; init; }
 
-    [JsonPropertyName("realizada_em")]
     public DateTime RealizadaEm { get; init; }
 
     public Transaction(int valor, char tipo, string descricao, DateTime realizadaEm)
