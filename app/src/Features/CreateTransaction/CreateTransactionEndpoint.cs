@@ -24,16 +24,9 @@ public static partial class CreateTransactionEndpoint
         if (result.Result is not Ok<CreateTransactionResponse> okResult)
             return result;
 
-        var transaction = new Transaction((int)request.Valor, request.Tipo, request.Descricao, request.CreatedAt);
-        var cacheEntry = new CreateTransactionCacheEntry(id, transaction);
-
-        CreateTransactionCache.Write(cacheEntry);
-
         return okResult;
     }
 }
-
-public record CreateTransactionCacheEntry(int ClientId, Transaction Transaction);
 
 
 public static class OperationType
@@ -67,4 +60,4 @@ public record CreateTransactionRequest(float Valor, char Tipo, string Descricao)
         return false;
     }
 }
-public readonly record struct CreateTransactionResponse(int Limite, int Saldo);
+public record CreateTransactionResponse(int Limite, int Saldo);

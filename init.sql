@@ -15,9 +15,10 @@ insert into "Clients" values
     (5, 500000, 0);
 
 create unlogged table "Transactions" (
+    "Id" serial primary key,
     "Amount" int not null,
     "OperationType" char(1) not null,
     "Description" varchar(10) not null,
-    "CreatedAt" timestamp with time zone not null,
+    "CreatedAt" timestamp without time zone not null,
     "ClientId" int not null
 );

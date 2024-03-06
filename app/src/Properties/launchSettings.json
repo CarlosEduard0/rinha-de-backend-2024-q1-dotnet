@@ -17,7 +17,6 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "ConnectionStrings__PostgreSQL": "Host=localhost;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;",
-        "ConnectionStrings__Redis": "localhost:30004,protocol=resp3"
       }
     },
     "https": {

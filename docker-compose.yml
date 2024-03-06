@@ -22,12 +22,10 @@ services:
     restart: unless-stopped
     depends_on:
       - postgres
-      - redis
     network_mode: host
     environment:
       UNIX_SOCKET: /sockets/api1.sock
       ConnectionStrings__PostgreSQL: Host=/sockets;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;
-      ConnectionStrings__Redis: localhost:30004,protocol=resp3
     volumes:
       - sockets:/sockets
     deploy:
@@ -41,7 +39,6 @@ services:
     environment:
       UNIX_SOCKET: /sockets/api2.sock
       ConnectionStrings__PostgreSQL: Host=/sockets;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;
-      ConnectionStrings__Redis: localhost:30004,protocol=resp3
 
   postgres:
     image: postgres
@@ -59,17 +56,6 @@ services:
         limits:
           cpus: "0.7"
           memory: "450MB"
-
-  redis:
-    image: redis:alpine
-    restart: unless-stopped
-    network_mode: host
-    command: --port 30004 --save ""
-    deploy:
-      resources:
-        limits:
-          cpus: "0.05"
-          memory: "30MB"
 
 volumes:
   sockets:

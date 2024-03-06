@@ -1,9 +1,9 @@
 using System.Text.Json;
 using RinhaBackend;
 
-await Task.WhenAll(RinhaBackendDatabase.Load(), RinhaBackendCache.Load());
+await RinhaBackendDatabase.Load();
 
-var builder = WebApplication.CreateEmptyBuilder(new());
+var builder = WebApplication.CreateEmptyBuilder(new(){ Args = args });
 
 builder.WebHost.UseKestrelCore();
 builder.WebHost.ConfigureKestrel(options =>
@@ -24,11 +24,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonSerializerContext.Default);
 });
 
-builder.Services.AddHostedService<TrimCacheWorker>();
-
 var app = builder.Build();
-
-CreateTransactionCache.Load(app.Lifetime.ApplicationStopping);
 
 app.MapCreateTransactionEndpoint();
 app.MapGetStatementEndpoint();

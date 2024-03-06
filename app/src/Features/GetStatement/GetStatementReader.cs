@@ -1,102 +1,73 @@
-﻿using System.Text.Json;
-using Microsoft.AspNetCore.Http.HttpResults;
+﻿using Microsoft.AspNetCore.Http.HttpResults;
 using Npgsql;
-using StackExchange.Redis;
 
 namespace RinhaBackend;
 
 public static class GetStatementReader
 {
-    private const string GetStatementQuery = """
-        SELECT "Balance", "Limit", "Amount", "OperationType", "Description", "CreatedAt"
-        FROM "Clients"
-        LEFT JOIN "Transactions" ON "Clients"."Id" = "Transactions"."ClientId"
-        WHERE "Id" = @id
-        ORDER BY "CreatedAt" DESC
+    private const string GetTransactionsQuery = """
+        SELECT "Amount", "OperationType", "Description", "CreatedAt"
+        FROM "Transactions"
+        WHERE "ClientId" = @id
+        ORDER BY "Id" DESC
         LIMIT 10
     """;
+
+    private const string GetClientByIdQuery = """SELECT "Limit", "Balance" FROM "Clients" WHERE "Id" = @id;""";
 
     private static readonly NpgsqlDataSource DataSource = RinhaBackendDatabase.DataSource;
 
     public static async Task<Results<Ok<GetStatementResponse>, NotFound>> GetStatement(int id, CancellationToken cancellationToken)
     {
-        var cacheResult =  await GetStatementFromCache(id);
-        if (cacheResult.Result is Ok<GetStatementResponse>)
-            return cacheResult;
+        await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
 
-        return await GetStatementFromDatabase(id, cancellationToken);
-    }
-
-    private static async Task<Results<Ok<GetStatementResponse>, NotFound>> GetStatementFromCache(int id)
-    {
-        var cacheKey = $"user:{id}:last_transactions";
-        var getTransactionsTask = RinhaBackendCache.Database.SortedSetRangeByRankAsync(cacheKey, 0, 9, Order.Descending);
-        var getBalanceTask = GetClientById(id);
-
-        await Task.WhenAll(getTransactionsTask, getBalanceTask);
-
-        var result = await getTransactionsTask;
-        var balance = await getBalanceTask;
-        if (result.Length == 0 || balance is null)
+        var balance = await GetBalance(id, connection, cancellationToken);
+        if (balance is null)
             return TypedResults.NotFound();
 
-        var transactions = new List<Transaction>(10);
-        foreach (var entry in result)
-        {
-            var cacheEntry = JsonSerializer.Deserialize(entry!, AppJsonSerializerContext.Default.CreateTransactionCacheEntry);
-            transactions.Add(cacheEntry!.Transaction);
-        }
-        var response = new GetStatementResponse(balance, transactions);
+        var transactions = await GetTransactions(id, connection, cancellationToken);
 
-        return TypedResults.Ok(response);
+        return TypedResults.Ok(new GetStatementResponse(balance, transactions));
     }
 
-    private const string GetClientByIdQuery = """SELECT "Limit", "Balance" FROM "Clients" WHERE "Id" = @id;""";
-    private static async Task<Balance?> GetClientById(int id)
+    private static async Task<Balance?> GetBalance(int id, NpgsqlConnection connection, CancellationToken cancellationToken)
     {
-        await using var connection = await DataSource.OpenConnectionAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText = GetClientByIdQuery;
-        command.Parameters.Add(new NpgsqlParameter<int>("id", id));
-        await command.PrepareAsync();
+        await using var getClientCommand = connection.CreateCommand();
+        getClientCommand.CommandText = GetClientByIdQuery;
+        getClientCommand.Parameters.Add(new NpgsqlParameter<int>("id", id));
+        await getClientCommand.PrepareAsync(cancellationToken);
 
-        await using var reader = await command.ExecuteReaderAsync();
-        if (!reader.HasRows)
+        await using var getClientReader = await getClientCommand.ExecuteReaderAsync(cancellationToken);
+        if (!getClientReader.HasRows)
             return null;
 
-        await reader.ReadAsync();
+        await getClientReader.ReadAsync(cancellationToken);
 
-        return new Balance(reader.GetInt32(1), DateTime.UtcNow, reader.GetInt32(0));
+        return new Balance(getClientReader.GetInt32(1), DateTime.UtcNow, getClientReader.GetInt32(0));
     }
 
-    private static async Task<Results<Ok<GetStatementResponse>, NotFound>> GetStatementFromDatabase(int id, CancellationToken cancellationToken)
+    private static async Task<IReadOnlyList<Transaction>> GetTransactions(int id, NpgsqlConnection connection, CancellationToken cancellationToken)
     {
-        await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
-        command.CommandText = GetStatementQuery;
+        command.CommandText = GetTransactionsQuery;
         command.Parameters.Add(new NpgsqlParameter<int>("id", id));
         await command.PrepareAsync(cancellationToken);
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!reader.HasRows)
-            return TypedResults.NotFound();
+            Array.Empty<Transaction>();
 
         await reader.ReadAsync(cancellationToken);
-        Balance balance = new(reader.GetInt32(0), DateTime.UtcNow, reader.GetInt32(1));
-        if (reader.IsDBNull(2))
-        {
-            return TypedResults.Ok(new GetStatementResponse(balance, Array.Empty<Transaction>()));
-        }
         var transactions = new List<Transaction>(10)
         {
-            new(reader.GetInt32(2), reader.GetChar(3), reader.GetString(4), reader.GetDateTime(5))
+            new(reader.GetInt32(0), reader.GetChar(1), reader.GetString(2), reader.GetDateTime(3))
         };
 
         while (await reader.ReadAsync(cancellationToken))
         {
-            transactions.Add(new(reader.GetInt32(2), reader.GetChar(3), reader.GetString(4), reader.GetDateTime(5)));
+            transactions.Add(new(reader.GetInt32(0), reader.GetChar(1), reader.GetString(2), reader.GetDateTime(3)));
         }
 
-        return TypedResults.Ok(new GetStatementResponse(balance, transactions));
+        return transactions;
     }
 }
