@@ -55,7 +55,7 @@ public static class GetStatementReader
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         if (!reader.HasRows)
-            Array.Empty<Transaction>();
+            return Array.Empty<Transaction>();
 
         await reader.ReadAsync(cancellationToken);
         var transactions = new List<Transaction>(10)
