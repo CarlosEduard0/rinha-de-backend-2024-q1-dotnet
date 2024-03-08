@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace RinhaBackend;
 
@@ -22,12 +23,11 @@ public static class CreateTransactionPersistence
         createTransactionCommand.Parameters[0].Value = (int)request.Valor;
         createTransactionCommand.Parameters[1].Value = request.Tipo;
         createTransactionCommand.Parameters[2].Value = request.Descricao;
-        createTransactionCommand.Parameters[3].Value = request.CreatedAt;
-        createTransactionCommand.Parameters[4].Value = request.ClientId;
-        createTransactionCommand.Parameters[5].Value = request.SignedAmount;
+        createTransactionCommand.Parameters[3].Value = request.ClientId;
+        createTransactionCommand.Parameters[4].Value = request.SignedAmount;
 
-        updateBalanceCommand.Parameters[0].Value = request.ClientId;
-        updateBalanceCommand.Parameters[1].Value = request.SignedAmount;
+        updateBalanceCommand.Parameters[0].Value = request.SignedAmount;
+        updateBalanceCommand.Parameters[1].Value = request.ClientId;
 
         await using var reader = await commandBatch.ExecuteReaderAsync(cancellationToken);
         if (!reader.HasRows)
@@ -54,12 +54,11 @@ public static class CreateTransactionPersistence
         return new(CreateTransactionQueries.CreateTransactionQuery)
         {
             Parameters = {
-                new NpgsqlParameter<int>("amount", NpgsqlTypes.NpgsqlDbType.Integer),
-                new NpgsqlParameter<char>("operationType", NpgsqlTypes.NpgsqlDbType.Char),
-                new NpgsqlParameter<string>("description", NpgsqlTypes.NpgsqlDbType.Varchar),
-                new NpgsqlParameter<DateTime>("createdAt", NpgsqlTypes.NpgsqlDbType.TimestampTz),
-                new NpgsqlParameter<int>("clientId", NpgsqlTypes.NpgsqlDbType.Integer),
-                new NpgsqlParameter<int>("signedAmount", NpgsqlTypes.NpgsqlDbType.Integer),
+                new() { NpgsqlDbType = NpgsqlDbType.Integer },
+                new() { NpgsqlDbType = NpgsqlDbType.Char },
+                new() { NpgsqlDbType = NpgsqlDbType.Varchar },
+                new() { NpgsqlDbType = NpgsqlDbType.Integer },
+                new() { NpgsqlDbType = NpgsqlDbType.Integer },
             }
         };
     }
@@ -69,8 +68,8 @@ public static class CreateTransactionPersistence
         return new(CreateTransactionQueries.UpdateBalanceQuery)
         {
             Parameters = {
-                new NpgsqlParameter<int>("clientId", NpgsqlTypes.NpgsqlDbType.Integer),
-                new NpgsqlParameter<int>("signedAmount", NpgsqlTypes.NpgsqlDbType.Integer),
+                new() { NpgsqlDbType = NpgsqlDbType.Integer },
+                new() { NpgsqlDbType = NpgsqlDbType.Integer },
             }
         };
     }

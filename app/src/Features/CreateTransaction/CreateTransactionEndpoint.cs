@@ -18,13 +18,13 @@ public static partial class CreateTransactionEndpoint
         if (request.IsInvalid())
             return TypedResults.UnprocessableEntity();
 
+        if (id is < 1 or > 5)
+            return TypedResults.NotFound();
         request.ClientId = id;
 
         var result = await  CreateTransactionPersistence.Create(request, cancellationToken);
-        if (result.Result is not Ok<CreateTransactionResponse> okResult)
-            return result;
 
-        return okResult;
+        return result;
     }
 }
 
@@ -43,9 +43,6 @@ public record CreateTransactionRequest(float Valor, char Tipo, string Descricao)
     [JsonIgnore]
     public int SignedAmount => (int)(Tipo is OperationType.CreditPrefix ? Valor : -Valor);
     
-    [JsonIgnore]
-    public readonly DateTime CreatedAt = DateTime.UtcNow;
-
     public bool IsInvalid()
     {
         if (Tipo is not (OperationType.CreditPrefix or OperationType.DebitPrefix))

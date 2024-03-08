@@ -19,6 +19,6 @@ create unlogged table "Transactions" (
     "Amount" int not null,
     "OperationType" char(1) not null,
     "Description" varchar(10) not null,
-    "CreatedAt" timestamp without time zone not null,
+    "CreatedAt" timestamp without time zone not null default now(),
     "ClientId" int not null
 );

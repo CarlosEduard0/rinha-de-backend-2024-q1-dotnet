@@ -1,6 +1,8 @@
 using System.Text.Json;
 using RinhaBackend;
 
+AppContext.SetSwitch("Npgsql.EnableSqlRewriting", false);
+
 await RinhaBackendDatabase.Load();
 
 var builder = WebApplication.CreateEmptyBuilder(new(){ Args = args });
