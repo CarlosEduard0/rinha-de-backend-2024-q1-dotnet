@@ -23,52 +23,49 @@ public static class GetStatementReader
         if (id is < 1 or > 5)
             return TypedResults.NotFound();
 
+
         await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
+        await using var batch = connection.CreateBatch();
+        var getBalanceCommand = CreateGetBalanceCommand();
+        var getTransactionsCommand = CreateGetTransactionsCommand();
+        batch.BatchCommands.Add(getBalanceCommand);
+        batch.BatchCommands.Add(getTransactionsCommand);
+        await batch.PrepareAsync(cancellationToken);
 
-        var balance = await GetBalance(id, connection, cancellationToken);
-        if (balance is null)
-            return TypedResults.NotFound();
+        getBalanceCommand.Parameters[0].Value = id;
+        getTransactionsCommand.Parameters[0].Value = id;
 
-        var transactions = await GetTransactions(id, connection, cancellationToken);
+        await using var reader = await batch.ExecuteReaderAsync(cancellationToken);
+        await reader.ReadAsync(cancellationToken);
 
-        return TypedResults.Ok(new GetStatementResponse(balance, transactions));
-    }
+        var balance = new Balance(reader.GetInt32(1), DateTime.UtcNow, reader.GetInt32(0));
 
-    private static async Task<Balance?> GetBalance(int id, NpgsqlConnection connection, CancellationToken cancellationToken)
-    {
-        await using var getClientCommand = connection.CreateCommand();
-        getClientCommand.CommandText = GetClientByIdQuery;
-        getClientCommand.Parameters.Add(new() { NpgsqlDbType = NpgsqlDbType.Integer });
-        await getClientCommand.PrepareAsync(cancellationToken);
-        getClientCommand.Parameters[0].Value = id;
-
-        await using var getClientReader = await getClientCommand.ExecuteReaderAsync(cancellationToken);
-        if (!getClientReader.HasRows)
-            return null;
-
-        await getClientReader.ReadAsync(cancellationToken);
-
-        return new Balance(getClientReader.GetInt32(1), DateTime.UtcNow, getClientReader.GetInt32(0));
-    }
-
-    private static async Task<IReadOnlyList<Transaction>> GetTransactions(int id, NpgsqlConnection connection, CancellationToken cancellationToken)
-    {
-        await using var command = connection.CreateCommand();
-        command.CommandText = GetTransactionsQuery;
-        command.Parameters.Add(new() { NpgsqlDbType = NpgsqlDbType.Integer });
-        await command.PrepareAsync(cancellationToken);
-        command.Parameters[0].Value = id;
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        if (!reader.HasRows)
-            return [];
+        await reader.NextResultAsync(cancellationToken);
+        if(!reader.HasRows)
+            return TypedResults.Ok(new GetStatementResponse(balance, []));
 
         var transactions = new List<Transaction>(10);
         while (await reader.ReadAsync(cancellationToken))
         {
-            transactions.Add(new(reader.GetInt32(0), reader.GetChar(1), reader.GetString(2), reader.GetDateTime(3)));
+            transactions.Add(new Transaction(reader.GetInt32(0), reader.GetChar(1), reader.GetString(2), reader.GetDateTime(3)));
         }
 
-        return transactions;
+        return TypedResults.Ok(new GetStatementResponse(balance, transactions));
     }
+
+    private static NpgsqlBatchCommand CreateGetTransactionsCommand() =>
+        new(GetTransactionsQuery)
+        {
+            Parameters = {
+                new() { NpgsqlDbType = NpgsqlDbType.Integer }
+            }
+        };
+
+    private static NpgsqlBatchCommand CreateGetBalanceCommand() =>
+        new(GetClientByIdQuery)
+        {
+            Parameters = {
+                new() { NpgsqlDbType = NpgsqlDbType.Integer }
+            }
+        };
 }

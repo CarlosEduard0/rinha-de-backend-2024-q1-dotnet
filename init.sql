@@ -1,7 +1,7 @@
 drop table if exists "Transactions";
 drop table if exists "Clients";
 
-create table "Clients" (
+create unlogged table "Clients" (
     "Id" serial primary key,
     "Limit" int,
     "Balance" int check ("Balance" >= "Limit" * -1)
