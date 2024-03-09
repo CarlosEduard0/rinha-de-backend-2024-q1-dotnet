@@ -7,7 +7,7 @@ public static partial class CreateTransactionEndpoint
 {
     public static IEndpointRouteBuilder MapCreateTransactionEndpoint(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/clientes/{id}/transacoes", Handle);
+        endpoints.MapPost("/clientes/{id}/transacoes", Handle).ShortCircuit();
 
         return endpoints;
     }
