@@ -2,9 +2,9 @@ drop table if exists "Transactions";
 drop table if exists "Clients";
 
 create table "Clients" (
-    "Id" int primary key,
-    "Limit" int not null,
-    "Balance" int not null
+    "Id" serial primary key,
+    "Limit" int,
+    "Balance" int check ("Balance" >= "Limit" * -1)
 );
 
 insert into "Clients" values
@@ -16,9 +16,9 @@ insert into "Clients" values
 
 create unlogged table "Transactions" (
     "Id" serial primary key,
-    "Amount" int not null,
-    "OperationType" char(1) not null,
-    "Description" varchar(10) not null,
-    "CreatedAt" timestamp without time zone not null default now(),
-    "ClientId" int not null
+    "Amount" int,
+    "OperationType" char(1),
+    "Description" varchar(10),
+    "CreatedAt" timestamp without time zone default now(),
+    "ClientId" int
 );

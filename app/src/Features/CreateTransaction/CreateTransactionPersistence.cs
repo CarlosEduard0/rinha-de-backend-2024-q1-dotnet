@@ -29,24 +29,16 @@ public static class CreateTransactionPersistence
         updateBalanceCommand.Parameters[0].Value = request.SignedAmount;
         updateBalanceCommand.Parameters[1].Value = request.ClientId;
 
-        await using var reader = await commandBatch.ExecuteReaderAsync(cancellationToken);
-        if (!reader.HasRows)
+        try
         {
-            await reader.DisposeAsync();
-            await using var userExistsCommand = connection.CreateCommand();
-            userExistsCommand.CommandText = CreateTransactionQueries.UserExistsQuery;
-            userExistsCommand.Parameters.Add(new NpgsqlParameter<int>("id", request.ClientId));
-            await userExistsCommand.PrepareAsync(cancellationToken);
-
-            var result = await userExistsCommand.ExecuteScalarAsync(cancellationToken);
-            if (result is null)
-                return TypedResults.NotFound();
-
+            await using var reader = await commandBatch.ExecuteReaderAsync(cancellationToken);
+            await reader.ReadAsync(cancellationToken);
+            return TypedResults.Ok(new CreateTransactionResponse(reader.GetInt32(0), reader.GetInt32(1)));
+        }
+        catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.CheckViolation)
+        {
             return TypedResults.UnprocessableEntity();
         }
-
-        await reader.ReadAsync(cancellationToken);
-        return TypedResults.Ok(new CreateTransactionResponse(reader.GetInt32(0), reader.GetInt32(1)));
     }
 
     private static NpgsqlBatchCommand CreateTransactionCommand()

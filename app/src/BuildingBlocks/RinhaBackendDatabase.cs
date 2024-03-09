@@ -10,6 +10,7 @@ public static class RinhaBackendDatabase
     public static async Task Load()
     {
         Console.WriteLine("[Database] Loading...");
+        AppContext.SetSwitch("Npgsql.EnableSqlRewriting", false);
         await using var connection = await DataSource.OpenConnectionAsync();
         var pingCommand = connection.CreateCommand();
         pingCommand.CommandText = "SELECT 1";
