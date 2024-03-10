@@ -23,17 +23,12 @@ public static class GetStatementReader
         if (id is < 1 or > 5)
             return TypedResults.NotFound();
 
-
         await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
-        await using var batch = connection.CreateBatch();
-        var getBalanceCommand = CreateGetBalanceCommand();
-        var getTransactionsCommand = CreateGetTransactionsCommand();
-        batch.BatchCommands.Add(getBalanceCommand);
-        batch.BatchCommands.Add(getTransactionsCommand);
-        await batch.PrepareAsync(cancellationToken);
+        await using var batch = GetStatementBatch();
+        batch.Connection = connection;
 
-        getBalanceCommand.Parameters[0].Value = id;
-        getTransactionsCommand.Parameters[0].Value = id;
+        batch.BatchCommands[0].Parameters[0].Value = id;
+        batch.BatchCommands[1].Parameters[0].Value = id;
 
         await using var reader = await batch.ExecuteReaderAsync(cancellationToken);
         await reader.ReadAsync(cancellationToken);
@@ -53,7 +48,16 @@ public static class GetStatementReader
         return TypedResults.Ok(new GetStatementResponse(balance, transactions));
     }
 
-    private static NpgsqlBatchCommand CreateGetTransactionsCommand() =>
+    private static NpgsqlBatch GetStatementBatch() =>
+        new()
+        {
+            BatchCommands = {
+                GetBalanceCommand(),
+                GetTransactionsCommand(),
+            }
+        };
+
+    private static NpgsqlBatchCommand GetTransactionsCommand() =>
         new(GetTransactionsQuery)
         {
             Parameters = {
@@ -61,7 +65,7 @@ public static class GetStatementReader
             }
         };
 
-    private static NpgsqlBatchCommand CreateGetBalanceCommand() =>
+    private static NpgsqlBatchCommand GetBalanceCommand() =>
         new(GetClientByIdQuery)
         {
             Parameters = {

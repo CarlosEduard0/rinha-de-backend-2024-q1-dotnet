@@ -11,34 +11,42 @@ public static class CreateTransactionPersistence
     public static async Task<Results<Ok<CreateTransactionResponse>, NotFound, UnprocessableEntity>> Create(CreateTransactionRequest request,
         CancellationToken cancellationToken)
     {
-        var createTransactionCommand = CreateTransactionCommand();
-        var updateBalanceCommand = CreateUpdateBalanceCommand();
-
         await using var connection = await DataSource.OpenConnectionAsync(cancellationToken);
-        await using var commandBatch = connection.CreateBatch();
-        commandBatch.BatchCommands.Add(createTransactionCommand);
-        commandBatch.BatchCommands.Add(updateBalanceCommand);
-        await commandBatch.PrepareAsync(cancellationToken);
+        await using var commandBatch = CreateTransactionBatch();
+        commandBatch.Connection = connection;
 
-        createTransactionCommand.Parameters[0].Value = (int)request.Valor;
-        createTransactionCommand.Parameters[1].Value = request.Tipo;
-        createTransactionCommand.Parameters[2].Value = request.Descricao;
-        createTransactionCommand.Parameters[3].Value = request.ClientId;
-        createTransactionCommand.Parameters[4].Value = request.SignedAmount;
+        commandBatch.BatchCommands[0].Parameters[0].Value = (int)request.Valor;
+        commandBatch.BatchCommands[0].Parameters[0].Value = (int)request.Valor;
+        commandBatch.BatchCommands[0].Parameters[1].Value = request.Tipo;
+        commandBatch.BatchCommands[0].Parameters[2].Value = request.Descricao;
+        commandBatch.BatchCommands[0].Parameters[3].Value = request.ClientId;
+        commandBatch.BatchCommands[0].Parameters[4].Value = request.SignedAmount;
 
-        updateBalanceCommand.Parameters[0].Value = request.SignedAmount;
-        updateBalanceCommand.Parameters[1].Value = request.ClientId;
+        commandBatch.BatchCommands[1].Parameters[0].Value = request.SignedAmount;
+        commandBatch.BatchCommands[1].Parameters[1].Value = request.ClientId;
 
         try
         {
             await using var reader = await commandBatch.ExecuteReaderAsync(cancellationToken);
             await reader.ReadAsync(cancellationToken);
-            return TypedResults.Ok(new CreateTransactionResponse(reader.GetInt32(0), reader.GetInt32(1)));
+            var response = new CreateTransactionResponse(reader.GetInt32(0), reader.GetInt32(1));
+            return TypedResults.Ok(response);
         }
         catch (PostgresException e) when (e.SqlState == PostgresErrorCodes.CheckViolation)
         {
             return TypedResults.UnprocessableEntity();
         }
+    }
+
+    private static NpgsqlBatch CreateTransactionBatch()
+    {
+        return new NpgsqlBatch()
+        {
+            BatchCommands = {
+                CreateTransactionCommand(),
+                CreateUpdateBalanceCommand()
+            }
+        };
     }
 
     private static NpgsqlBatchCommand CreateTransactionCommand()
