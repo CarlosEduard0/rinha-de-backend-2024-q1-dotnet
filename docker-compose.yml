@@ -18,7 +18,7 @@ services:
           memory: "10MB"
 
   api1: &api
-    image: carloseduard0/rinha-backend-dotnet
+    image: carloseduard0/rinha-de-backend-2024-q1-dotnet
     restart: unless-stopped
     depends_on:
       - postgres
@@ -31,7 +31,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.3"
+          cpus: "0.35"
           memory: "30MB"
 
   api2:
@@ -54,8 +54,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.7"
-          memory: "450MB"
+          cpus: "0.6"
+          memory: "480MB"
 
 volumes:
   sockets:
