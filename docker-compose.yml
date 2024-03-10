@@ -25,7 +25,7 @@ services:
     network_mode: host
     environment:
       UNIX_SOCKET: /sockets/api1.sock
-      ConnectionStrings__PostgreSQL: Host=/sockets;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;
+      ConnectionStrings__PostgreSQL: Host=/sockets;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;Multiplexing=true;Max Auto Prepare=100;Auto Prepare Min Usages=1;
     volumes:
       - sockets:/sockets
     deploy:
@@ -38,7 +38,7 @@ services:
     <<: *api
     environment:
       UNIX_SOCKET: /sockets/api2.sock
-      ConnectionStrings__PostgreSQL: Host=/sockets;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;
+      ConnectionStrings__PostgreSQL: Host=/sockets;Port=30003;Database=postgres;Username=postgres;Password=postgres;Enlist=false;No Reset On Close=true;Multiplexing=true;Max Auto Prepare=100;Auto Prepare Min Usages=1;
 
   postgres:
     image: postgres
